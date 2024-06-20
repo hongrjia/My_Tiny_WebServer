@@ -46,6 +46,7 @@ private:
     int m_sql_num;
 
     //线程池相关
+    int m_thread_num;
 
     //epoll_evetn
 
