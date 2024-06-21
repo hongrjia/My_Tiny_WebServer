@@ -9,6 +9,7 @@
 #include <semaphore.h>
 #include <exception>
 #include <pthread.h>
+#include <iostream>
 
 
 //信号量
@@ -17,7 +18,7 @@ class sem
 public:
     sem()
     {
-        if(esm_init(&m_sem,0,0) != 0){
+        if(sem_init(&m_sem,0,0) != 0){
             throw std::exception();
         }
     }
@@ -117,7 +118,7 @@ public:
     bool timewait(pthread_mutex_t* m_mutex,struct timespec t)
     {
         int ret = 0;
-        ret = pthread_cond_timewait(&m_cond,m_mutex,&t);
+        ret = pthread_cond_timedwait(&m_cond,m_mutex,&t);
         return ret == 0;
     }
 
@@ -129,7 +130,7 @@ public:
 
     bool broadcast()
     {
-        return thread_cond_broadcast(&cond);
+        return pthread_cond_broadcast(&m_cond) == 0;
     }
 
 private:

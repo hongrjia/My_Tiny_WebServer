@@ -7,7 +7,9 @@
 
 #include <iostream>
 #include <string>
+#include "./mysql/sql_pool.h"
 
+using namespace std;
 
 class WebServer
 {
@@ -25,6 +27,10 @@ public:
      * */
      void log_write();
 
+     /**
+      * @brief 数据库初始化
+      * */
+    void sql_pool();
 
 private:
     //基础
@@ -36,10 +42,10 @@ private:
 
     int m_pipefd[2];
     int m_epollfd;
-    http_conn *users;
+    //http_conn *users;
 
     //数据库相关
-    connection_pool *m_connPool;
+    Connection_pool *m_connPool;
     string m_user;         //登陆数据库用户名
     string m_passWord;     //登陆数据库密码
     string m_databaseName; //使用数据库名
@@ -52,7 +58,7 @@ private:
 
     int m_listenfd;
     int m_Opt_LINGER;
-    INT m_TRIGMode;
+    int m_TRIGMode;
     int m_ListenTrigmode;
     int m_CONNTrigMode;
 

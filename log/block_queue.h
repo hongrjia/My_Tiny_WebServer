@@ -135,7 +135,7 @@ public:
      *当有元素push进队列,相当于生产者生产了一个元素
      *若当前没有线程等待条件变量,则唤醒无意义
      */
-    bool push(const T * item)
+    bool push(const T & item)
     {
         m_mutex.lock();
         if(m_size >= m_max_size)
@@ -182,7 +182,7 @@ public:
 
 
         struct timespec t = {0,0};
-        struct timespec now = {0,0};
+        struct timeval now = {0,0};
         gettimeofday(&now,NULL);
         m_mutex.lock();
 

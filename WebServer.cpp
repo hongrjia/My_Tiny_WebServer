@@ -18,7 +18,7 @@ WebServer::~WebServer()
 }
 
 
-void WebServer::init(int port, int user, int passwd, int databaseName, int log_Write, int opt_linger, int trig_mode,
+void WebServer::init(int port, string user, string passwd, string databaseName, int log_Write, int opt_linger, int trig_mode,
                      int sql_num, int thread_num, int close_log, int actor_model)
 {
     m_port  = port;
@@ -41,10 +41,16 @@ void WebServer::log_write()
     {
         //初始化日志
         if(1 == m_log_write)
+            //异步
             Log::get_instace()->init("./ServerLog",m_close_log,2000,800000,800);
         else
             Log::get_instace()->init("./ServerLog",m_close_log,2000,800000,0);
     }
+}
+
+void WebServer::sql_pool()
+{
+
 }
 
 

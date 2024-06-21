@@ -46,7 +46,7 @@ void Config::parse_arg(int argc, char **argv)
     const char* str = "p:l:m:o:s:t:c:a";
     while((opt = getopt(argc,argv,str)) != -1)
     {
-        switch (ops) {
+        switch (opt) {
             case 'p':
             {
                 PORT = atoi(optarg);

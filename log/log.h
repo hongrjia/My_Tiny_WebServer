@@ -7,21 +7,23 @@
 #define MY_TINY_WEB_TEST_LOG_H
 
 #include <iostream>
-#include <stdio.h>
+#include <cstdio>
 #include <string>
 #include "./lock/locker.h"
 #include "block_queue.h"
+using namespace std;
 
 class Log
 {
 public:
+    //单例模式
     static Log* get_instace()
     {
         static Log instance;
         return &instance;
     }
 
-    static void *flush_log_thread(void *arhs)
+    static void *flush_log_thread(void *args)
     {
         Log::get_instace()->async_write_log();
     }

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(My_tiny_Web_Test)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 11)
 
 include_directories(.)
 include_directories(lock)
@@ -17,3 +17,6 @@ add_executable(My_tiny_Web_Test
         main.cpp
         WebServer.cpp
         WebServer.h)
+
+
+target_link_libraries(My_tiny_Web_Test pthread)
