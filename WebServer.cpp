@@ -42,15 +42,19 @@ void WebServer::log_write()
         //初始化日志
         if(1 == m_log_write)
             //异步
-            Log::get_instace()->init("./ServerLog",m_close_log,2000,800000,800);
+            Log::get_instance()->init("./ServerLog",m_close_log,2000,800000,800);
         else
-            Log::get_instace()->init("./ServerLog",m_close_log,2000,800000,0);
+            Log::get_instance()->init("./ServerLog",m_close_log,2000,800000,0);
     }
 }
 
 void WebServer::sql_pool()
 {
+    //初始化数据库连接池
+    m_connPool = Connection_pool::get_instance();
+    m_connPool->init("localhost",m_user,m_passWord,m_databaseName,3306,m_sql_num,m_close_log);
 
+    users->initmysql_result(m_connPool);
 }
 
 

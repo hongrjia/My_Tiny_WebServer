@@ -17,7 +17,7 @@ class Log
 {
 public:
     //单例模式
-    static Log* get_instace()
+    static Log* get_instance()
     {
         static Log instance;
         return &instance;

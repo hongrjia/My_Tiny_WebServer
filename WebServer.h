@@ -8,6 +8,7 @@
 #include <iostream>
 #include <string>
 #include "./mysql/sql_pool.h"
+#include "../http/http_conn.h"
 
 using namespace std;
 
@@ -42,7 +43,7 @@ private:
 
     int m_pipefd[2];
     int m_epollfd;
-    //http_conn *users;
+    http_conn *users;
 
     //数据库相关
     Connection_pool *m_connPool;
