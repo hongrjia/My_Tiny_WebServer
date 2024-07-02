@@ -19,7 +19,7 @@ Connection_pool::~Connection_pool()
     DestroyPool();
 }
 
-void Connection_pool::init(string url, int User, int PassWord, int DataBaseName, int Port, int MaxConn, int close_log)
+void Connection_pool::init(string url, string User, string PassWord, string DataBaseName, int Port, int MaxConn, int close_log)
 {
     //初始化
     m_url =url;
@@ -80,9 +80,9 @@ MYSQL *Connection_pool::GetConnection()
 }
 
 //释放当前使用的连接
-bool Connection_pool::ReleaseConnection(int *Conn)
+bool Connection_pool::ReleaseConnection(MYSQL *Conn)
 {
-    if(NUll == Conn)
+    if(NULL == Conn)
         return false;
 
     lock.lock();
@@ -122,7 +122,7 @@ int Connection_pool::GetFreeConn()
 }
 
 
-connectionRAII::connectionRAII(int **con, Connection_pool *connPool)
+connectionRAII::connectionRAII(MYSQL **con, Connection_pool *connPool)
 {
     *con = connPool->GetConnection();
 

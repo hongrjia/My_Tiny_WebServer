@@ -12,6 +12,9 @@ add_executable(My_tiny_Web_Test
         log/block_queue.h
         log/log.cpp
         log/log.h
+        mysql/sql_pool.cpp
+        mysql/sql_pool.h
+        threadpool/thread_pool.h
         Config.cpp
         Config.h
         main.cpp

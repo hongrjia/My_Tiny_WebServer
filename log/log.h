@@ -25,7 +25,7 @@ public:
 
     static void *flush_log_thread(void *args)
     {
-        Log::get_instace()->async_write_log();
+        Log::get_instance()->async_write_log();
     }
 
     //可选择的参数有日志文件、日志缓冲区大小、最大行数以及最长日志条队列

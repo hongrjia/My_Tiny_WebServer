@@ -1,0 +1,1 @@
+/usr/bin/c++   -g   CMakeFiles/My_tiny_Web_Test.dir/log/log.cpp.o CMakeFiles/My_tiny_Web_Test.dir/Config.cpp.o CMakeFiles/My_tiny_Web_Test.dir/main.cpp.o CMakeFiles/My_tiny_Web_Test.dir/WebServer.cpp.o  -o My_tiny_Web_Test 

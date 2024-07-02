@@ -5,6 +5,8 @@
 #include "WebServer.h"
 
 #include "./log/log.h"
+#include <cassert>
+
 
 WebServer::WebServer()
 {
@@ -54,8 +56,308 @@ void WebServer::sql_pool()
     m_connPool = Connection_pool::get_instance();
     m_connPool->init("localhost",m_user,m_passWord,m_databaseName,3306,m_sql_num,m_close_log);
 
+    //初始数据库连接池
     users->initmysql_result(m_connPool);
 }
+
+void WebServer::thread_pool()
+{
+    m_pool = new threadpool<http_conn>(m_actormodel,m_connPool,m_thread_num);
+}
+
+void WebServer::trig_mode()
+{
+    // LT + LT
+    if(0 == m_TRIGMode)
+    {
+        m_ListenTrigmode = 0;
+        m_CONNTrigMode =0;
+    }
+
+    //LT + ET
+    if(1 == m_TRIGMode)
+    {
+        m_ListenTrigmode = 0;
+        m_CONNTrigMode =1;
+    }
+
+    //ET + LT
+    if(2 == m_TRIGMode)
+    {
+        m_ListenTrigmode = 1;
+        m_CONNTrigMode =0;
+    }
+
+    //ET +ET
+    if(3 == m_TRIGMode)
+    {
+        m_ListenTrigmode = 1;
+        m_CONNTrigMode =1;
+    }
+}
+
+void WebServer::eventListen()
+{
+    //创建套接字
+    m_listenfd = socket(PF_INET,SOCK_STREAM,0);
+    assert(m_listenfd >= 0);
+
+    //关闭连接
+    if(0 == m_Opt_LINGER)
+    {
+        struct linger tmp = {0,1};
+        setsockopt(m_listenfd,SOL_SOCKET,SO_LINGER,&tmp,sizeof(tmp));
+    }else if(1 == m_Opt_LINGER){
+        struct linger tmp = {1,1};
+        setsockopt(m_listenfd,SOL_SOCKET,SO_LINGER,&tmp,sizeof(tmp));
+    }
+
+
+    int ret = 0;
+    struct sockaddr_in addr;
+    bzero(&addr,sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_port = htons(m_port);
+
+    int flag = 1;
+    setsockopt(m_listenfd,SOL_SOCKET,SO_REUSEADDR,&flag,sizeof(flag));
+    ret = bind(m_listenfd,(struct sockaddr *)&addr, sizeof(addr));
+    assert(ret >= 0);
+    ret = listen(m_listenfd,5); //最大连接个数5
+    assert(ret >= 0);
+
+    utils.init(TIMESLOT);
+
+
+    //epoll创建内核事件表
+    epoll_event events[MAX_EVENT_NUMBER];
+    m_epollfd = epoll_create(5);
+    assert(m_epollfd != -1);
+
+    utils.addfd(m_epollfd,m_listenfd, false,m_ListenTrigmode);
+    http_conn::m_epollfd = m_epollfd;
+
+    ret = socketpair(PF_UNIX,SOCK_STREAM,0,m_pipefd);
+    assert(ret != -1);
+    utils.setnonblocking(m_pipefd[1]);
+    utils.addfd(m_epollfd,m_pipefd[0], false,0);
+
+    utils.addsig(SIGPIPE,SIG_IGN);
+    utils.addsig(SIGALRM,utils.sig_handler,false);
+    utils.addsig(SIGTERM,utils.sig_handler,false);
+
+
+    alarm(TIMESLOT);
+
+
+    //工具类 信号和描述符基础操作
+    Utils::u_pipefd = m_pipefd;
+    Utils::u_epollfd = m_epollfd;
+}
+
+void WebServer::timer(int connfd, struct sockaddr_in client_address)
+{
+    users[connfd].init(connfd,client_address,m_root,m_CONNTrigMode,m_close_log,m_user,m_passWord,m_databaseName);
+
+
+    //初始化client_data数据
+    //创建定时器 设置回调函数和超时函数 绑定用户数据，将定时器添加到链表中
+    users_timer[connfd].address = client_address;
+    users_timer[connfd].scokfd =connfd;
+    util_time *timer = new util_time;
+    timer->user_data = &users_timer[connfd];
+    timer->cb_func = cb_func;
+    time_t cur = time(NULL);
+    timer->expire = cur + 3*TIMESLOT;
+    users_timer[connfd].timer = timer;
+    utils.m_timer_lst.add_timer(timer);
+}
+
+//若有数据传输，则将定时器往后延迟3个单位
+//并对新的定时器在链表上的位置进行调整
+void WebServer::adjust_timer(util_time *timer)
+{
+    time_t cur = time(NULL);
+    timer->expire = cur + 3 * TIMESLOT;
+    utils.m_timer_lst.adjust_timer(timer);
+
+    LOG_INFO("%s","adjust timer once");
+}
+
+void WebServer::deal_timer(util_time *timer, int sockfd)
+{
+    timer->cb_func(&users_timer[sockfd]);
+    if(timer)
+    {
+        utils.m_timer_lst.del_timer(timer);
+    }
+
+    LOG_INFO("close fd %s",users_timer[sockfd].sockfd);
+}
+
+
+bool WebServer::dealclientdata()
+{
+    struct sockaddr_in client_address;
+    socklen_t client_addrlength = sizeof(client_address);
+    if(0 == m_ListenTrigmode)
+    {
+        int connfd = accept(m_listenfd,(struct sockaddr *)&client_address,&client_addrlength);
+        if(connfd < 0)
+        {
+            LOG_ERROR("%s:errno is %d","accept error",errno);
+            return false;
+        }
+
+        if(http_conn::m_user_count >= MAX_FD)
+        {
+            utils.show_error(connfd,"Internal server busy");
+            LOG_ERROR("%s","Internal server busy");
+            return false;
+        }
+        timer(connfd,client_address);
+    }
+    else{
+        while (1)
+        {
+            int connfd = accept(m_listenfd,(struct sockaddr*)&client_address,&client_addrlength);
+            if(connfd < 0)
+            {
+                LOG_ERROR("%s:errno is %d","accept error",errno);
+                break;
+            }
+
+            if(http_conn::m_user_count >= MAX_FD)
+            {
+                utils.show_error(connfd,"Internal server busy");
+                LOG_ERROR("%s:errno is %d","accept error",errno);
+                break;
+            }
+            timer(connfd,client_address);
+        }
+        return false;
+    }
+    return true;
+}
+
+
+bool WebServer::dealwithsignal(bool &timeout, bool &stop_server)
+{
+    int ret = 0;
+    int sig;
+    char signals[1024];
+    ret = recv(m_pipefd[0],signals, sizeof(signals),0);
+    if(ret == -1)
+    {
+        return false;
+    }else if(ret == 0){
+        return false;
+    }
+    else{
+        for(int i=0;i<ret;++i)
+        {
+            switch (signals[i]) {
+                case SIGALRM:
+                {
+                    timeout = true;
+                    break;
+                }
+                case SIGTERM:
+                {
+                    stop_server = true;
+                    break;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+
+void WebServer::eventLoop()
+{
+    bool timeout = false;
+    bool stop_server = false;
+
+    while(!stop_server)
+    {
+        int number = epoll_wait(m_epollfd,events,MAX_EVENT_NUMBER,-1);
+        if(number < 0 && errno != EINTR)
+        {
+            LOG_ERROR("%s","epoll fail");
+            break;
+        }
+
+        for(int i=0;i<number;++i)
+        {
+            int sockfd = events[i].data.fd;
+
+            //处理新的客户连接
+            if(sockfd == m_listenfd)
+            {
+                bool flag = dealclientdata();
+                if(false == flag)
+                    continue;
+            }else if(events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)){
+                //服务器关闭连接，移除对应的定时器
+                util_time *timer = users_timer[sockfd].timer;
+                deal_timer(timer,sockfd);
+            }
+            //处理信号
+            else if((sockfd == m_pipefd[0]) && (events[i].events & EPOLLIN))
+            {
+                bool flag = dealwithsignal(timeout,stop_server);
+                if(false == flag)
+                    LOG_ERROR("%s","dealclientdata failure");
+            }
+            //处理客户连接上收到的数据
+            else if(events[i].events & EPOLLIN){
+                dealwithread(sockfd);
+            }
+            else if(events[i].events & EPOLLOUT)
+            {
+                dealwithwrite(sockfd);
+            }
+        }
+
+        if(timeout)
+        {
+            utils.timer_handler();
+
+            LOG_INFO("%s","timer tick");
+
+            timeout = false;
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
